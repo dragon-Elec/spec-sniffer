@@ -1,0 +1,33 @@
+# .github/workflows/spec-sniffer.yml
+name: "System Spec Sniffer"
+
+on:
+  # This allows you to run the workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  sniff_x86_specs:
+    name: "Sniff x86_64 Specs (ubuntu-latest)"
+    runs-on: ubuntu-latest # Standard Intel/AMD runner
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "Run Spec Sniffer on x86_64"
+        run: |
+          chmod +x ./spec_sniffer.sh
+          ./spec_sniffer.sh
+
+  sniff_arm_specs:
+    name: "Sniff ARM64 Specs (ubuntu-24.04-arm)"
+    runs-on: ubuntu-24.04-arm # ARM-based runner
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "Run Spec Sniffer on ARM64"
+        run: |
+          chmod +x ./spec_sniffer.sh
+          ./spec_sniffer.sh
