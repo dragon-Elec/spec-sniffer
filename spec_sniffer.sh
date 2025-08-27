@@ -39,31 +39,34 @@ print_header "CPU Information"
 # lscpu provides a detailed and well-formatted summary
 lscpu
 
-# Attempt to read CPU frequency from sysfs, with added debugging.
-echo -e "\n${C_YELLOW}--- Attempting to read CPU frequency from sysfs ---${C_RESET}"
-FREQ_MAX_FILE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
-FREQ_CUR_FILE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+# Attempt to read CPU frequency from sysfs using common paths to support different systems
+FREQ_PATH=""
+# First, check the path discovered on ARM runners
+if [ -d "/sys/devices/system/cpu/cpufreq/policy0" ]; then
+    FREQ_PATH="/sys/devices/system/cpu/cpufreq/policy0"
+# Then, check the path common on other systems
+elif [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
+    FREQ_PATH="/sys/devices/system/cpu/cpu0/cpufreq"
+fi
 
-if [ -r "$FREQ_MAX_FILE" ]; then
-    # Read value in KHz and convert to MHz for readability
-    max_freq_khz=$(cat "$FREQ_MAX_FILE")
-    max_freq_mhz=$((max_freq_khz / 1000))
-    echo "Max Scaling Frequency   : ${max_freq_mhz} MHz"
+# If a valid path was found, read the frequency files
+if [ -n "$FREQ_PATH" ]; then
+    echo -e "\n${C_YELLOW}CPU Frequency (from sysfs):${C_RESET}"
+    FREQ_MAX_FILE="$FREQ_PATH/scaling_max_freq"
+    FREQ_CUR_FILE="$FREQ_PATH/scaling_cur_freq"
+
+    if [ -r "$FREQ_MAX_FILE" ]; then
+        max_freq_khz=$(cat "$FREQ_MAX_FILE")
+        max_freq_mhz=$((max_freq_khz / 1000))
+        printf "  %-25s: %s MHz\n" "Max Scaling Frequency" "$max_freq_mhz"
+    fi
 
     if [ -r "$FREQ_CUR_FILE" ]; then
         cur_freq_khz=$(cat "$FREQ_CUR_FILE")
         cur_freq_mhz=$((cur_freq_khz / 1000))
-        echo "Current Scaling Frequency: ${cur_freq_mhz} MHz"
+        printf "  %-25s: %s MHz\n" "Current Scaling Frequency" "$cur_freq_mhz"
     fi
-else
-    echo "CPU frequency files not found at expected path: $FREQ_MAX_FILE"
-    echo "Listing available directories for debugging..."
-    echo -e "\n${C_YELLOW}--- Contents of /sys/devices/system/cpu/ ---${C_RESET}"
-    ls -l /sys/devices/system/cpu/
-    echo -e "\n${C_YELLOW}--- Contents of /sys/devices/system/cpu/cpu0/ ---${C_RESET}"
-    ls -l /sys/devices/system/cpu/cpu0/
 fi
-echo -e "${C_YELLOW}--- End of CPU frequency check ---${C_RESET}"
 
 print_header "Memory (RAM) Usage"
 # -h flag makes it human-readable (e.g., GiB, MiB)
