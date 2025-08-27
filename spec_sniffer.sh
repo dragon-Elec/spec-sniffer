@@ -39,13 +39,12 @@ print_header "CPU Information"
 # lscpu provides a detailed and well-formatted summary
 lscpu
 
-# Attempt to read CPU frequency from sysfs, which is often more reliable
-# in virtualized environments or on certain architectures (e.g., ARM).
+# Attempt to read CPU frequency from sysfs, with added debugging.
+echo -e "\n${C_YELLOW}--- Attempting to read CPU frequency from sysfs ---${C_RESET}"
 FREQ_MAX_FILE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
 FREQ_CUR_FILE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
 
 if [ -r "$FREQ_MAX_FILE" ]; then
-    echo -e "\n${C_YELLOW}CPU Frequency (from sysfs):${C_RESET}"
     # Read value in KHz and convert to MHz for readability
     max_freq_khz=$(cat "$FREQ_MAX_FILE")
     max_freq_mhz=$((max_freq_khz / 1000))
@@ -56,7 +55,15 @@ if [ -r "$FREQ_MAX_FILE" ]; then
         cur_freq_mhz=$((cur_freq_khz / 1000))
         echo "Current Scaling Frequency: ${cur_freq_mhz} MHz"
     fi
+else
+    echo "CPU frequency files not found at expected path: $FREQ_MAX_FILE"
+    echo "Listing available directories for debugging..."
+    echo -e "\n${C_YELLOW}--- Contents of /sys/devices/system/cpu/ ---${C_RESET}"
+    ls -l /sys/devices/system/cpu/
+    echo -e "\n${C_YELLOW}--- Contents of /sys/devices/system/cpu/cpu0/ ---${C_RESET}"
+    ls -l /sys/devices/system/cpu/cpu0/
 fi
+echo -e "${C_YELLOW}--- End of CPU frequency check ---${C_RESET}"
 
 print_header "Memory (RAM) Usage"
 # -h flag makes it human-readable (e.g., GiB, MiB)
