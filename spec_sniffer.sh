@@ -39,33 +39,32 @@ print_header "CPU Information"
 # lscpu provides a detailed and well-formatted summary
 lscpu
 
-# Attempt to read CPU frequency from sysfs using common paths to support different systems
-FREQ_PATH=""
-# First, check the path discovered on ARM runners
-if [ -d "/sys/devices/system/cpu/cpufreq/policy0" ]; then
-    FREQ_PATH="/sys/devices/system/cpu/cpufreq/policy0"
-# Then, check the path common on other systems
-elif [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
-    FREQ_PATH="/sys/devices/system/cpu/cpu0/cpufreq"
-fi
+# Check for CPU frequency using the most reliable methods for ARM runners
+echo -e "\n${C_YELLOW}CPU Frequency Information:${C_RESET}"
+FREQ_FILE="/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq"
 
-# If a valid path was found, read the frequency files
-if [ -n "$FREQ_PATH" ]; then
-    echo -e "\n${C_YELLOW}CPU Frequency (from sysfs):${C_RESET}"
-    FREQ_MAX_FILE="$FREQ_PATH/scaling_max_freq"
-    FREQ_CUR_FILE="$FREQ_PATH/scaling_cur_freq"
+# Primary Method: Try reading from sysfs, which is fast and direct.
+if [ -r "$FREQ_FILE" ]; then
+    echo "  Method Used: Reading from sysfs"
+    max_freq_khz=$(cat "$FREQ_FILE")
+    max_freq_mhz=$((max_freq_khz / 1000))
+    printf "  %-25s: %s MHz\n" "Max Frequency" "$max_freq_mhz"
 
-    if [ -r "$FREQ_MAX_FILE" ]; then
-        max_freq_khz=$(cat "$FREQ_MAX_FILE")
-        max_freq_mhz=$((max_freq_khz / 1000))
-        printf "  %-25s: %s MHz\n" "Max Scaling Frequency" "$max_freq_mhz"
-    fi
-
-    if [ -r "$FREQ_CUR_FILE" ]; then
-        cur_freq_khz=$(cat "$FREQ_CUR_FILE")
+    CUR_FREQ_FILE="/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq"
+    if [ -r "$CUR_FREQ_FILE" ]; then
+        cur_freq_khz=$(cat "$CUR_FREQ_FILE")
         cur_freq_mhz=$((cur_freq_khz / 1000))
-        printf "  %-25s: %s MHz\n" "Current Scaling Frequency" "$cur_freq_mhz"
+        printf "  %-25s: %s MHz\n" "Current Frequency" "$cur_freq_mhz"
     fi
+# Fallback Method: Use 'perf' to measure real-time cycles if sysfs is unavailable.
+elif command -v perf &> /dev/null; then
+    echo "  Method Used: Measuring with perf (sysfs path not found)"
+    # Run perf and capture stderr, then filter for the relevant line of output.
+    perf_output=$(perf stat -e cycles sleep 1 2>&1)
+    cycles_line=$(echo "$perf_output" | grep 'cycles' | sed 's/^[ \t]*//') # Trim leading whitespace
+    printf "  %-25s: %s\n" "Perf Measurement" "$cycles_line"
+else
+    echo "  Could not determine CPU frequency. Neither sysfs nor perf is available."
 fi
 
 print_header "Memory (RAM) Usage"
