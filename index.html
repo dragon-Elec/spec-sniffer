@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Spec Sniffer Demo</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2em; color: #333; max-width: 800px; margin: auto; }
+        h1 { color: #111; }
+        h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5em;}
+        pre { background-color: #f4f4f4; padding: 1em; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+        code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; }
+        .note { background-color: #fffbe6; border-left: 4px solid #ffc107; padding: 1em; margin-top: 1em; border-radius: 4px; }
+        .instructions { background-color: #eef; border-left: 4px solid #3f51b5; padding: 1em; margin-top: 2em; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <h1>Javascript System Spec Sniffer</h1>
+    <p>This page demonstrates the <code>spec-sniffer.js</code> script. The specs detected in your current browser environment are shown below.</p>
+
+    <div class="note">
+        <strong>Note:</strong> The accuracy and availability of these specs depend entirely on what your browser decides to expose. For example, <code>deviceMemoryGB</code> is an approximation, and storage quota is specific to this website's origin, not your entire disk.
+    </div>
+
+    <h2>Detected Specifications</h2>
+    <pre><code id="specs-output">Detecting...</code></pre>
+
+    <div class="instructions">
+        <h3>How to use in Node.js or Bun</h3>
+        <p>1. Make sure <code>spec-sniffer.js</code> is in the same directory.</p>
+        <p>2. Create a file named <code>test.js</code> with the following content:</p>
+        <pre><code>const { getSystemSpecs } = require('./spec-sniffer.js');
+
+async function runTest() {
+    console.log("Detecting system specs in Node.js...");
+    const specs = await getSystemSpecs();
+    console.log(JSON.stringify(specs, null, 2));
+}
+
+runTest();</code></pre>
+        <p>3. Run the script from your terminal: <code>node test.js</code> (or <code>bun test.js</code>)</p>
+    </div>
+
+
+    <script src="spec-sniffer.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const outputElement = document.getElementById('specs-output');
+
+            getSystemSpecs().then(specs => {
+                // Use JSON.stringify for pretty printing the object
+                outputElement.textContent = JSON.stringify(specs, null, 2);
+            }).catch(error => {
+                outputElement.textContent = `An error occurred while sniffing specs:\n${error}`;
+                console.error(error);
+            });
+        });
+    </script>
+
+</body>
+</html>
