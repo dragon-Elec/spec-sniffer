@@ -1,0 +1,259 @@
+name: "CPU Core Power Analysis - Ubuntu 24.04 LTS"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'  # Daily at 9 AM UTC
+
+jobs:
+  # Job 1: Quick spec snapshot (like spec_sniffer)
+  system-specs:
+    name: "System Specs Snapshot"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: System Specifications
+        run: |
+          echo "=== System Information ==="
+          hostnamectl
+          echo ""
+          echo "=== CPU Specs ==="
+          lscpu
+          echo ""
+          echo "=== Memory ==="
+          free -h
+          echo ""
+          echo "=== Disk ==="
+          df -h /
+
+  # Job 2: Core power measurement (main analysis)
+  core-power-analysis:
+    name: "Core Power Analysis"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: |
+          chmod +x *.sh *.py 2>/dev/null || true
+
+      - name: "Run Bash Core Power Analyzer"
+        run: |
+          ./github_actions_cpu_power_analyzer.sh
+
+      - name: "Run Python Core Power Analyzer"
+        run: |
+          python3 github_actions_core_power_analyzer.py
+
+  # Job 3: Compare against different runner types
+  runner-comparison:
+    name: "Compare Runner: ${{ matrix.runner }}"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-latest
+          - ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Quick CPU Benchmark
+        run: |
+          echo "=== ${{ matrix.runner }} ==="
+
+          echo "CPU Info:"
+          grep "model name" /proc/cpuinfo | head -1
+          grep "cpu MHz" /proc/cpuinfo | wc -l
+          echo "cores detected"
+
+          echo ""
+          echo "Arithmetic Benchmark (50M ops):"
+          python3 << 'EOF'
+import time
+start = time.time()
+sum(range(50_000_000))
+duration = (time.time() - start) * 1000
+print(f"Time: {duration:.2f}ms")
+print(f"Ops/sec: {50_000_000 * 1000 / duration:,.0f}")
+EOF
+
+          echo ""
+          echo "Prime Finding Benchmark:"
+          python3 << 'EOF'
+import time, math
+start = time.time()
+def is_prime(n):
+    if n < 2: return False
+    if n == 2: return True
+    if n % 2 == 0: return False
+    for i in range(3, int(math.sqrt(n)) + 1, 2):
+        if n % i == 0: return False
+    return True
+primes = [n for n in range(2, 50000) if is_prime(n)]
+duration = (time.time() - start) * 1000
+print(f"Found {len(primes)} primes in {duration:.2f}ms")
+EOF
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-${{ matrix.runner }}
+          path: |
+            *.txt
+            *.json
+          retention-days: 30
+
+  # Job 4: Thermal & frequency monitoring
+  thermal-monitoring:
+    name: "Thermal & Frequency Monitoring"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: CPU Thermal Information
+        run: |
+          echo "=== CPU Frequency Governor ==="
+          cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "Not available"
+
+          echo ""
+          echo "=== Thermal Zones ==="
+          for zone in /sys/class/thermal/thermal_zone*; do
+              if [ -f "$zone/temp" ]; then
+                  temp=$(cat "$zone/temp")
+                  temp_c=$(echo "scale=1; $temp / 1000" | bc)
+                  name=$(cat "$zone/type" 2>/dev/null || echo "Unknown")
+                  echo "$name: ${temp_c}°C"
+              fi
+          done || echo "No thermal data available"
+
+          echo ""
+          echo "=== CPU Throttling Check ==="
+          # Check if CPU is throttled
+          for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+              if [ -f "$policy/cpuinfo_max_freq" ] && [ -f "$policy/scaling_cur_freq" ]; then
+                  max=$(cat "$policy/cpuinfo_max_freq")
+                  cur=$(cat "$policy/scaling_cur_freq")
+                  if [ "$cur" -lt "$max" ]; then
+                      ratio=$(echo "scale=1; $cur * 100 / $max" | bc)
+                      echo "CPU currently at ${ratio}% of max frequency (possible throttling)"
+                  fi
+              fi
+          done
+
+  # Job 5: Performance regression detection
+  perf-regression-check:
+    name: "Performance Regression Check"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baseline Performance Test
+        id: baseline
+        run: |
+          echo "Running baseline performance tests..."
+
+          python3 << 'EOF'
+import time, json, math
+
+results = {}
+
+# Test 1: Arithmetic
+start = time.time()
+sum(range(100_000_000))
+results['arithmetic_ms'] = (time.time() - start) * 1000
+
+# Test 2: Prime finding
+def is_prime(n):
+    if n < 2: return False
+    if n == 2: return True
+    if n % 2 == 0: return False
+    for i in range(3, int(math.sqrt(n)) + 1, 2):
+        if n % i == 0: return False
+    return True
+
+start = time.time()
+primes = [n for n in range(2, 100000) if is_prime(n)]
+results['prime_finding_ms'] = (time.time() - start) * 1000
+
+# Test 3: List sorting
+lst = list(range(1_000_000, 0, -1))
+start = time.time()
+lst.sort()
+results['sort_1m_ms'] = (time.time() - start) * 1000
+
+print("Performance Metrics:")
+for key, val in results.items():
+    print(f"  {key}: {val:.2f}ms")
+
+with open('perf_baseline.json', 'w') as f:
+    json.dump(results, f, indent=2)
+EOF
+
+      - name: Upload Baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-baseline
+          path: perf_baseline.json
+          retention-days: 90
+
+  # Job 6: Generate summary report
+  summary-report:
+    name: "Summary Report"
+    runs-on: ubuntu-24.04
+    needs: [system-specs, core-power-analysis, runner-comparison]
+    if: always()
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# GitHub Actions CPU Core Power Analysis Report" > summary.md
+          echo "" >> summary.md
+          echo "Generated: $(date)" >> summary.md
+          echo "Runner: ubuntu-24.04" >> summary.md
+          echo "Repository: ${{ github.repository }}" >> summary.md
+          echo "Commit: ${{ github.sha }}" >> summary.md
+          echo "" >> summary.md
+
+          echo "## Key Metrics" >> summary.md
+          echo "- Cores: $(nproc)" >> summary.md
+          echo "- Memory: $(free -h | grep Mem | awk '{print $2}')" >> summary.md
+          echo "- Kernel: $(uname -r)" >> summary.md
+          echo "" >> summary.md
+
+          echo "## Next Steps" >> summary.md
+          echo "1. Review the detailed benchmark results in artifacts" >> summary.md
+          echo "2. Compare against baseline metrics" >> summary.md
+          echo "3. Identify any performance regressions" >> summary.md
+          echo "4. Adjust CI/CD workflows if needed" >> summary.md
+
+          cat summary.md
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-summary
+          path: summary.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.existsSync('summary.md') 
+              ? fs.readFileSync('summary.md', 'utf8')
+              : 'CPU analysis completed. Check artifacts for details.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## CPU Core Power Analysis\n\n${summary}`
+            });
