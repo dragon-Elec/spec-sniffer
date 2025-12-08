@@ -77,30 +77,30 @@ jobs:
           echo ""
           echo "Arithmetic Benchmark (50M ops):"
           python3 << 'EOF'
-import time
-start = time.time()
-sum(range(50_000_000))
-duration = (time.time() - start) * 1000
-print(f"Time: {duration:.2f}ms")
-print(f"Ops/sec: {50_000_000 * 1000 / duration:,.0f}")
-EOF
+          import time
+          start = time.time()
+          sum(range(50_000_000))
+          duration = (time.time() - start) * 1000
+          print(f"Time: {duration:.2f}ms")
+          print(f"Ops/sec: {50_000_000 * 1000 / duration:,.0f}")
+          EOF
 
           echo ""
           echo "Prime Finding Benchmark:"
           python3 << 'EOF'
-import time, math
-start = time.time()
-def is_prime(n):
-    if n < 2: return False
-    if n == 2: return True
-    if n % 2 == 0: return False
-    for i in range(3, int(math.sqrt(n)) + 1, 2):
-        if n % i == 0: return False
-    return True
-primes = [n for n in range(2, 50000) if is_prime(n)]
-duration = (time.time() - start) * 1000
-print(f"Found {len(primes)} primes in {duration:.2f}ms")
-EOF
+          import time, math
+          start = time.time()
+          def is_prime(n):
+              if n < 2: return False
+              if n == 2: return True
+              if n % 2 == 0: return False
+              for i in range(3, int(math.sqrt(n)) + 1, 2):
+                  if n % i == 0: return False
+              return True
+          primes = [n for n in range(2, 50000) if is_prime(n)]
+          duration = (time.time() - start) * 1000
+          print(f"Found {len(primes)} primes in {duration:.2f}ms")
+          EOF
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -161,41 +161,41 @@ EOF
           echo "Running baseline performance tests..."
 
           python3 << 'EOF'
-import time, json, math
+          import time, json, math
 
-results = {}
+          results = {}
 
-# Test 1: Arithmetic
-start = time.time()
-sum(range(100_000_000))
-results['arithmetic_ms'] = (time.time() - start) * 1000
+          # Test 1: Arithmetic
+          start = time.time()
+          sum(range(100_000_000))
+          results['arithmetic_ms'] = (time.time() - start) * 1000
 
-# Test 2: Prime finding
-def is_prime(n):
-    if n < 2: return False
-    if n == 2: return True
-    if n % 2 == 0: return False
-    for i in range(3, int(math.sqrt(n)) + 1, 2):
-        if n % i == 0: return False
-    return True
+          # Test 2: Prime finding
+          def is_prime(n):
+              if n < 2: return False
+              if n == 2: return True
+              if n % 2 == 0: return False
+              for i in range(3, int(math.sqrt(n)) + 1, 2):
+                  if n % i == 0: return False
+              return True
 
-start = time.time()
-primes = [n for n in range(2, 100000) if is_prime(n)]
-results['prime_finding_ms'] = (time.time() - start) * 1000
+          start = time.time()
+          primes = [n for n in range(2, 100000) if is_prime(n)]
+          results['prime_finding_ms'] = (time.time() - start) * 1000
 
-# Test 3: List sorting
-lst = list(range(1_000_000, 0, -1))
-start = time.time()
-lst.sort()
-results['sort_1m_ms'] = (time.time() - start) * 1000
+          # Test 3: List sorting
+          lst = list(range(1_000_000, 0, -1))
+          start = time.time()
+          lst.sort()
+          results['sort_1m_ms'] = (time.time() - start) * 1000
 
-print("Performance Metrics:")
-for key, val in results.items():
-    print(f"  {key}: {val:.2f}ms")
+          print("Performance Metrics:")
+          for key, val in results.items():
+              print(f"  {key}: {val:.2f}ms")
 
-with open('perf_baseline.json', 'w') as f:
-    json.dump(results, f, indent=2)
-EOF
+          with open('perf_baseline.json', 'w') as f:
+              json.dump(results, f, indent=2)
+          EOF
 
       - name: Upload Baseline
         uses: actions/upload-artifact@v4
